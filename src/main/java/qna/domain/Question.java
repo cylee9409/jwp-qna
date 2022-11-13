@@ -1,7 +1,9 @@
 package qna.domain;
 
+import qna.CannotDeleteException;
+
 import javax.persistence.*;
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,8 +26,8 @@ public class Question extends BaseTimeEntity {
     @JoinColumn(name = "writer_id", foreignKey = @ForeignKey(name = "fk_question_writer"))
     private User writer;
 
-    @OneToMany(mappedBy = "question")
-    private List<Answer> answers = new ArrayList<>();
+    @Embedded
+    private Answers answers = new Answers();
 
     protected Question() {
 
@@ -41,8 +43,8 @@ public class Question extends BaseTimeEntity {
         this.contents = contents;
     }
 
-    public List<Answer> getAnswers() {
-        return this.answers;
+    public Answers getAnswers() {
+        return answers;
     }
 
     public Question writeBy(User writer) {
@@ -56,47 +58,53 @@ public class Question extends BaseTimeEntity {
 
     public void addAnswer(Answer answer) {
         answer.toQuestion(this);
-        answers.add(answer);
+        answers.addAnswer(answer);
+    }
+
+    public DeleteHistories delete(User loginUser, Long questionId) throws CannotDeleteException {
+        DeleteHistories deleteHistories = new DeleteHistories();
+
+        checkDeleteAuthorization(loginUser);
+
+        if (answers.isEmpty()) {
+            this.deleted = true;
+            deleteHistories.add(new DeleteHistory(ContentType.QUESTION, questionId, writer, LocalDateTime.now()));
+            return deleteHistories;
+        }
+
+        if (answers.checkAnswerWriter(loginUser)) {
+            this.deleted = true;
+            deleteHistories.add(new DeleteHistory(ContentType.QUESTION, questionId, writer, LocalDateTime.now()));
+            deleteHistories = answers.delete(deleteHistories);
+        }
+
+        return deleteHistories;
+    }
+
+    public void checkDeleteAuthorization(User loginUser) throws CannotDeleteException {
+        if (!this.isOwner(loginUser)) {
+            throw new CannotDeleteException("질문을 삭제할 권한이 없습니다.");
+        }
     }
 
     public Long getId() {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public String getTitle() {
         return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
     }
 
     public String getContents() {
         return contents;
     }
 
-    public void setContents(String contents) {
-        this.contents = contents;
-    }
-
     public User getWriter() {
         return this.writer;
     }
 
-    public void setWriterId(User writer) {
-        this.writer = writer;
-    }
-
     public boolean isDeleted() {
         return deleted;
-    }
-
-    public void setDeleted(boolean deleted) {
-        this.deleted = deleted;
     }
 
     @Override

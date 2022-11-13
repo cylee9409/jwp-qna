@@ -3,10 +3,12 @@ package qna.domain;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import qna.CannotDeleteException;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 @DataJpaTest
@@ -89,7 +91,20 @@ public class QuestionRepositoryTest {
         question.addAnswer(answers.save(AnswerTest.A1));
         question.addAnswer(answers.save(AnswerTest.A2.writeBy(UserTest.JAVAJIGI)));
 
-        assertThat(question.getAnswers()).hasSize(2);
+//        assertThat(question.getAnswers()).hasSize(2);
+
+    }
+
+    @Test
+    @DisplayName("질문 삭제 권한 예외 처리 확인")
+    void check_delete_authorization_exception_test() {
+
+        Question question = questions.findByIdAndDeletedFalse(QuestionTest.Q1.getId()).get();
+        User loginUser = UserTest.SANJIGI;
+
+        assertThatThrownBy(() ->
+                question.checkDeleteAuthorization(loginUser)
+        ).isInstanceOf(CannotDeleteException.class);
 
     }
 
